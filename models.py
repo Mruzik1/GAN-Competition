@@ -117,6 +117,7 @@ class CycleGAN(LightningModule):
         self.id_coef = id_coef
 
         self.train_step = 0
+        self.counter_gen_dis = 0            # to switch between training a generator and a discriminator
         self.automatic_optimization = False
     
         self.mse = nn.MSELoss()
@@ -129,11 +130,15 @@ class CycleGAN(LightningModule):
         opt_gx, opt_gy, opt_dx, opt_dy = self.optimizers()
         real_x, real_y = batch
 
+        self.counter_gen_dis += 1
+        if self.counter_gen_dis > 40:
+            self.counter_gen_dis = 0
+
         fake_y = self.gx(real_x)
         fake_x = self.gy(real_y)
 
         # update generators
-        if batch_idx % 3 != 0:
+        if self.counter_gen_dis < 20:
             rec_x = self.gy(fake_y)
             rec_y = self.gx(fake_x)
             fake_dx = self.dx(fake_x)
