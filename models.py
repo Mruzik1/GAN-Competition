@@ -1,5 +1,8 @@
 import torch
-import torch.nn as nn
+from torch import nn
+from torch import optim
+
+from lightning.pytorch import LightningModule
 
 
 class ResidualBlock(nn.Module):
@@ -96,6 +99,79 @@ class DiscriminatorPatchGAN(nn.Module):
         x = self.leaky_relu(self.instance_norm3(self.conv3(x)))
         x = self.sigmoid(self.conv4(x))
         return x
+
+
+class CycleGAN(LightningModule):
+    def __init__(self, gx, gy, dx, dy, g_lr, d_lr, device, rec_coef=10, id_coef=2):
+        super(CycleGAN, self).__init__()
+
+        # gx: X -> Y, gy: Y -> X, dx(X), dy(Y)
+        self.gx = gx
+        self.gy = gy
+        self.dx = dx
+        self.dy = dy
+
+        self.g_lr = g_lr
+        self.d_lr = d_lr
+        self.rec_coef = rec_coef
+        self.id_coef = id_coef
+
+        self.device = device
+        self.train_step = 0
+    
+        self.mse = nn.MSELoss()
+        self.mae = nn.L1Loss()
+    
+    def forward(self, x):
+        return self.gx(x)
+    
+    def training_step(self, batch, batch_idx, optimizer_idx):
+        real_x, real_y = batch
+
+        fake_y = self.gx(real_x)
+        fake_x = self.gy(real_y)
+
+        rec_x = self.gy(fake_y)
+        rec_y = self.gx(fake_x)
+
+        # update generators
+        if optimizer_idx in [0, 1]:
+            val_gx = self.mse(self.dy(fake_y), torch.ones_like(fake_y).to(self.device))
+            val_gy = self.mse(self.dx(fake_x), torch.ones_like(fake_x).to(self.device))
+            val_loss = (val_gx + val_gy) / 2
+
+            rec_x_loss = self.mae(rec_y, real_y)
+            rec_y_loss = self.mae(rec_y, real_x)
+            rec_loss = (rec_x_loss + rec_y_loss) / 2
+
+            id_x = self.mae(fake_x, real_x)
+            id_y = self.mae(fake_y, real_y)
+            id_loss = (id_x + id_y) / 2
+
+            loss_g = val_loss + self.rec_coef*rec_loss + self.id_coef*id_loss
+            return {'loss': loss_g, 'validity': val_loss, 'recon': rec_loss, 'identity': id_loss}
+
+        # update discriminators
+        elif optimizer_idx in [2, 3]:
+            rec_dx_loss = self.mse(self.dx(fake_x.detach()), torch.zeros_like(fake_x).to(self.device))
+            rec_dy_loss = self.mse(self.dy(fake_y.detach()), torch.zeros_like(fake_y).to(self.device))
+            rec_loss = rec_dx_loss + rec_dy_loss
+
+            val_dx_loss = self.mse(self.dx(real_x), torch.ones_like(real_x).to(self.device))
+            val_dy_loss = self.mse(self.dx(real_y), torch.ones_like(real_y).to(self.device))
+            val_loss = val_dx_loss + val_dy_loss
+
+            loss_d = (rec_loss + val_loss) / 2
+            self.train_step += 1
+            return {'loss': loss_d}
+
+    def configure_optimizers(self):
+        self.gx_optimizer = optim.Adam(self.gx.parameters(), lr=self.g_lr, betas=(0.5, 0.999))
+        self.gy_optimizer = optim.Adam(self.gy.parameters(), lr=self.g_lr, betas=(0.5, 0.999))
+        self.dx_optimizer = optim.Adam(self.dx.parameters(), lr=self.d_lr, betas=(0.5, 0.999))
+        self.dy_optimizer = optim.Adam(self.dy.parameters(), lr=self.d_lr, betas=(0.5, 0.999))
+
+        return [self.gx_optimizer, self.gy_optimizer, self.dx_optimizer, self.dy_optimizer], []
 
 
 if __name__ == "__main__":
