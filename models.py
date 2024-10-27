@@ -81,9 +81,9 @@ class DiscriminatorPatchGAN(nn.Module):
     def __init__(self):
         super(DiscriminatorPatchGAN, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=4, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=4, stride=2, padding=1, bias=nn.InstanceNorm2d)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, bias=nn.InstanceNorm2d)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=2, bias=nn.InstanceNorm2d)
         self.conv4 = nn.Conv2d(128, 1, kernel_size=4, stride=1)
 
         self.sigmoid = nn.Sigmoid()
@@ -132,14 +132,12 @@ class CycleGAN(LightningModule):
         fake_y = self.gx(real_x)
         fake_x = self.gy(real_y)
 
-        # used in both generator and discriminator steps
-        fake_dx = self.dx(fake_x)
-        fake_dy = self.dy(fake_y)
-
         # update generators
         if batch_idx % 3 != 0:
             rec_x = self.gy(fake_y)
             rec_y = self.gx(fake_x)
+            fake_dx = self.dx(fake_x)
+            fake_dy = self.dy(fake_y)
 
             val_gx = self.mse(fake_dx, torch.ones_like(fake_dx).to(self.device))
             val_gy = self.mse(fake_dy, torch.ones_like(fake_dy).to(self.device))
@@ -169,6 +167,8 @@ class CycleGAN(LightningModule):
         else:
             real_dx = self.dx(real_x)
             real_dy = self.dy(real_y)
+            fake_dx = self.dx(fake_x.detach())
+            fake_dy = self.dy(fake_y.detach())
 
             rec_dx_loss = self.mse(fake_dx, torch.zeros_like(fake_dx).to(self.device))
             rec_dy_loss = self.mse(fake_dy, torch.zeros_like(fake_dy).to(self.device))
@@ -180,10 +180,9 @@ class CycleGAN(LightningModule):
             loss_d = (rec_loss + val_dx_loss + val_dy_loss) / 3
             self.train_step += 1
             self.log("loss_d", loss_d)
-            self.log("train_step", self.train_step)
             
             # save images
-            if self.train_step % 3 == 0:
+            if self.train_step % 5 == 0:
                 imgs = [
                     real_x[0].cpu().detach().permute(1, 2, 0).numpy(), 
                     real_y[0].cpu().detach().permute(1, 2, 0).numpy(), 
