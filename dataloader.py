@@ -41,12 +41,14 @@ class MonetDataModule(LightningDataModule):
             transforms.ToTensor(),
             transforms.Resize((img_size, img_size)),
             transforms.RandomCrop(img_size),
-            transforms.RandomHorizontalFlip()
+            transforms.RandomHorizontalFlip(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
 
         self.transforms_test = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Resize((img_size, img_size))
+            transforms.Resize((img_size, img_size)),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
     
     def setup(self, stage: str = None) -> None:
@@ -77,5 +79,6 @@ if __name__ == "__main__":
     data_loader = data_module.test_dataloader()
     
     fig, ax = plt.subplots()
-    ax.imshow(next(iter(data_loader))[1][0].transpose(0, 2))
+    print(next(iter(data_loader))[1][0].transpose(0, 2))
+    ax.imshow((next(iter(data_loader))[1][0].transpose(0, 2) + 1) / 2)
     plt.show()
