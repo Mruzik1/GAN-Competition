@@ -132,15 +132,15 @@ class CycleGAN(LightningModule):
         fake_y = self.gx(real_x)
         fake_x = self.gy(real_y)
 
-        rec_x = self.gy(fake_y)
-        rec_y = self.gx(fake_x)
-
         # used in both generator and discriminator steps
         fake_dx = self.dx(fake_x)
         fake_dy = self.dy(fake_y)
 
         # update generators
-        if batch_idx % 4 != 0:
+        if batch_idx % 3 != 0:
+            rec_x = self.gy(fake_y)
+            rec_y = self.gx(fake_x)
+
             val_gx = self.mse(fake_dx, torch.ones_like(fake_dx).to(self.device))
             val_gy = self.mse(fake_dy, torch.ones_like(fake_dy).to(self.device))
             val_loss = (val_gx + val_gy) / 2
@@ -172,15 +172,26 @@ class CycleGAN(LightningModule):
 
             rec_dx_loss = self.mse(fake_dx, torch.zeros_like(fake_dx).to(self.device))
             rec_dy_loss = self.mse(fake_dy, torch.zeros_like(fake_dy).to(self.device))
-            rec_loss = rec_dx_loss + rec_dy_loss
+            rec_loss = (rec_dx_loss + rec_dy_loss) / 2
 
             val_dx_loss = self.mse(real_dx, torch.ones_like(real_dx).to(self.device))
             val_dy_loss = self.mse(real_dy, torch.ones_like(real_dy).to(self.device))
-            val_loss = val_dx_loss + val_dy_loss
 
-            loss_d = (rec_loss + val_loss) / 2
+            loss_d = (rec_loss + val_dx_loss + val_dy_loss) / 3
             self.train_step += 1
             self.log("loss_d", loss_d)
+            self.log("train_step", self.train_step)
+            
+            # save images
+            if self.train_step % 3 == 0:
+                imgs = [
+                    real_x[0].cpu().detach().permute(1, 2, 0).numpy(), 
+                    real_y[0].cpu().detach().permute(1, 2, 0).numpy(), 
+                    fake_y[0].cpu().detach().permute(1, 2, 0).numpy(),
+                    fake_x[0].cpu().detach().permute(1, 2, 0).numpy(),
+                ]
+                img_names = [f"real_x", f"real_y", f"fake_x", f"fake_y"]
+                self.logger.log_image(key=f"sample", caption=img_names, images=imgs)
 
             self.manual_backward(loss_d)
             opt_dx.step()

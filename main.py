@@ -1,5 +1,5 @@
 import torch
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
 
 from models import GeneratorGAN, DiscriminatorPatchGAN, CycleGAN
@@ -22,15 +22,26 @@ if __name__ == "__main__":
         init_weights(model, init_type="xavier")
 
     print("Initializing CycleGAN...")
+    # cycle_gan = CycleGAN.load_from_checkpoint(
+    #     "./logs/lightning_logs/version_6/checkpoints/epoch=2-step=2112.ckpt",
+    #     gx=generator_x, 
+    #     gy=generator_y, 
+    #     dx=discriminator_x, 
+    #     dy=discriminator_y,
+    #     g_lr=0.0002,
+    #     d_lr=0.0002,
+    #     rec_coef=5,
+    #     id_coef=2,
+    # ).to(device)
     cycle_gan = CycleGAN(
-        generator_x, 
-        generator_y, 
-        discriminator_x, 
-        discriminator_y,
+        gx=generator_x, 
+        gy=generator_y, 
+        dx=discriminator_x, 
+        dy=discriminator_y,
         g_lr=0.0002,
         d_lr=0.0002,
         rec_coef=5,
-        id_coef=2
+        id_coef=2,
     ).to(device)
 
     print("Loading data...")
@@ -42,7 +53,7 @@ if __name__ == "__main__":
 
     print("Loading trainer...")
     trainer = Trainer(
-        logger=TensorBoardLogger("./logs"),
+        logger=WandbLogger(project="CycleGAN"),
         max_epochs=epochs,
         num_sanity_val_steps=0
     )
