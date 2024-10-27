@@ -74,9 +74,38 @@ class GeneratorGAN(nn.Module):
         return x
     
 
+class DiscriminatorPatchGAN(nn.Module):
+    def __init__(self):
+        super(DiscriminatorPatchGAN, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=4, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=2)
+        self.conv4 = nn.Conv2d(128, 1, kernel_size=4, stride=1)
+
+        self.sigmoid = nn.Sigmoid()
+        self.leaky_relu = nn.LeakyReLU(0.2, inplace=True)
+
+        self.instance_norm1 = nn.InstanceNorm2d(32)
+        self.instance_norm2 = nn.InstanceNorm2d(64)
+        self.instance_norm3 = nn.InstanceNorm2d(128)
+
+    def forward(self, x):
+        x = self.leaky_relu(self.instance_norm1(self.conv1(x)))
+        x = self.leaky_relu(self.instance_norm2(self.conv2(x)))
+        x = self.leaky_relu(self.instance_norm3(self.conv3(x)))
+        x = self.sigmoid(self.conv4(x))
+        return x
+
+
 if __name__ == "__main__":
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    model = GeneratorGAN().to(device)
-    dummy_data = torch.rand((32, 3, 256, 256)).to(device)
-    print(model(dummy_data).shape)
+    generator = GeneratorGAN().to(device)
+    discriminator = DiscriminatorPatchGAN().to(device)
+    dummy_data = torch.rand((32, 3, 256, 256)).to(device) * 2 - 1
+
+    gen_out = generator(dummy_data)
+    disc_out = discriminator(gen_out)
+
+    print(disc_out.shape)
