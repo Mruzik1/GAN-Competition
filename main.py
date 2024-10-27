@@ -22,18 +22,8 @@ if __name__ == "__main__":
         init_weights(model, init_type="xavier")
 
     print("Initializing CycleGAN...")
-    # cycle_gan = CycleGAN.load_from_checkpoint(
-    #     "./logs/lightning_logs/version_6/checkpoints/epoch=2-step=2112.ckpt",
-    #     gx=generator_x, 
-    #     gy=generator_y, 
-    #     dx=discriminator_x, 
-    #     dy=discriminator_y,
-    #     g_lr=0.0002,
-    #     d_lr=0.0002,
-    #     rec_coef=5,
-    #     id_coef=2,
-    # ).to(device)
-    cycle_gan = CycleGAN(
+    cycle_gan = CycleGAN.load_from_checkpoint(
+        "./CycleGAN/l35p2n5j/checkpoints/epoch=0-step=704.ckpt",
         gx=generator_x, 
         gy=generator_y, 
         dx=discriminator_x, 
@@ -43,6 +33,16 @@ if __name__ == "__main__":
         rec_coef=5,
         id_coef=2,
     ).to(device)
+    # cycle_gan = CycleGAN(
+    #     gx=generator_x, 
+    #     gy=generator_y, 
+    #     dx=discriminator_x, 
+    #     dy=discriminator_y,
+    #     g_lr=0.0002,
+    #     d_lr=0.0002,
+    #     rec_coef=5,
+    #     id_coef=2,
+    # ).to(device)
 
     print("Loading data...")
     data_module = MonetDataModule(

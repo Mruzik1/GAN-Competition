@@ -131,14 +131,25 @@ class CycleGAN(LightningModule):
         real_x, real_y = batch
 
         self.counter_gen_dis += 1
-        if self.counter_gen_dis > 40:
+        if self.counter_gen_dis > 80:
             self.counter_gen_dis = 0
 
         fake_y = self.gx(real_x)
         fake_x = self.gy(real_y)
 
+        # save images
+        if self.train_step % 50 == 0:
+            imgs = [
+                real_x[0].cpu().detach().permute(1, 2, 0).numpy(), 
+                real_y[0].cpu().detach().permute(1, 2, 0).numpy(), 
+                fake_y[0].cpu().detach().permute(1, 2, 0).numpy(),
+                fake_x[0].cpu().detach().permute(1, 2, 0).numpy(),
+            ]
+            img_names = [f"real_x", f"real_y", f"fake_x", f"fake_y"]
+            self.logger.log_image(key=f"sample", caption=img_names, images=imgs)
+
         # update generators
-        if self.counter_gen_dis < 20:
+        if self.counter_gen_dis < 40:
             rec_x = self.gy(fake_y)
             rec_y = self.gx(fake_x)
             fake_dx = self.dx(fake_x)
@@ -185,17 +196,6 @@ class CycleGAN(LightningModule):
             loss_d = (rec_loss + val_dx_loss + val_dy_loss) / 3
             self.train_step += 1
             self.log("loss_d", loss_d)
-            
-            # save images
-            if self.train_step % 5 == 0:
-                imgs = [
-                    real_x[0].cpu().detach().permute(1, 2, 0).numpy(), 
-                    real_y[0].cpu().detach().permute(1, 2, 0).numpy(), 
-                    fake_y[0].cpu().detach().permute(1, 2, 0).numpy(),
-                    fake_x[0].cpu().detach().permute(1, 2, 0).numpy(),
-                ]
-                img_names = [f"real_x", f"real_y", f"fake_x", f"fake_y"]
-                self.logger.log_image(key=f"sample", caption=img_names, images=imgs)
 
             self.manual_backward(loss_d)
             opt_dx.step()
