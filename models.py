@@ -47,19 +47,20 @@ class GeneratorGAN(nn.Module):
         # self.max_pool = nn.MaxPool2d(kernel_size=2)
 
         # encoder
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=2)
 
         # transformation with res blocks
-        self.res1 = ResidualBlock(128, 128, stride=1)
-        self.res2 = ResidualBlock(128, 128, stride=1)
-        self.res3 = ResidualBlock(128, 128, stride=1)
+        self.res1 = ResidualBlock(256, 256, stride=1)
+        self.res2 = ResidualBlock(256, 256, stride=1)
+        self.res3 = ResidualBlock(256, 256, stride=1)
+        self.res4 = ResidualBlock(256, 256, stride=1)
         
         # decoder
-        self.trans_conv1 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, output_padding=1)
-        self.trans_conv2 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, output_padding=1)
-        self.conv4 = nn.Conv2d(32, 3, kernel_size=7, stride=1)
+        self.trans_conv1 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, output_padding=1)
+        self.trans_conv2 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, output_padding=1)
+        self.conv4 = nn.Conv2d(64, 3, kernel_size=7, stride=1)
     
     def forward(self, x):
         x = self.relu(self.conv1(x))
@@ -81,17 +82,17 @@ class DiscriminatorPatchGAN(nn.Module):
     def __init__(self):
         super(DiscriminatorPatchGAN, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=4, stride=2, padding=1, bias=nn.InstanceNorm2d)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, bias=nn.InstanceNorm2d)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=2, bias=nn.InstanceNorm2d)
-        self.conv4 = nn.Conv2d(128, 1, kernel_size=4, stride=1)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=4, stride=2, padding=1, bias=nn.InstanceNorm2d)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1, bias=nn.InstanceNorm2d)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=2, bias=nn.InstanceNorm2d)
+        self.conv4 = nn.Conv2d(256, 1, kernel_size=4, stride=1)
 
         self.sigmoid = nn.Sigmoid()
         self.leaky_relu = nn.LeakyReLU(0.2, inplace=True)
 
-        self.instance_norm1 = nn.InstanceNorm2d(32)
-        self.instance_norm2 = nn.InstanceNorm2d(64)
-        self.instance_norm3 = nn.InstanceNorm2d(128)
+        self.instance_norm1 = nn.InstanceNorm2d(64)
+        self.instance_norm2 = nn.InstanceNorm2d(128)
+        self.instance_norm3 = nn.InstanceNorm2d(256)
 
     def forward(self, x):
         x = self.leaky_relu(self.instance_norm1(self.conv1(x)))
