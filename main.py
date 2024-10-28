@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     print("Initializing CycleGAN...")
     cycle_gan = CycleGAN.load_from_checkpoint(
-        "./CycleGAN/l35p2n5j/checkpoints/epoch=0-step=704.ckpt",
+        "./CycleGAN/nsfrhc0e/checkpoints/epoch=5-step=4224.ckpt",
         gx=generator_x, 
         gy=generator_y, 
         dx=discriminator_x, 

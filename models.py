@@ -130,8 +130,9 @@ class CycleGAN(LightningModule):
         opt_gx, opt_gy, opt_dx, opt_dy = self.optimizers()
         real_x, real_y = batch
 
+        self.train_step += 1
         self.counter_gen_dis += 1
-        if self.counter_gen_dis > 80:
+        if self.counter_gen_dis > 300:
             self.counter_gen_dis = 0
 
         fake_y = self.gx(real_x)
@@ -149,11 +150,11 @@ class CycleGAN(LightningModule):
             self.logger.log_image(key=f"sample", caption=img_names, images=imgs)
 
         # update generators
-        if self.counter_gen_dis < 40:
+        if self.counter_gen_dis > 100:
             rec_x = self.gy(fake_y)
             rec_y = self.gx(fake_x)
-            fake_dx = self.dx(fake_x)
-            fake_dy = self.dy(fake_y)
+            fake_dx = self.dx(fake_x).detach()
+            fake_dy = self.dy(fake_y).detach()
 
             val_gx = self.mse(fake_dx, torch.ones_like(fake_dx).to(self.device))
             val_gy = self.mse(fake_dy, torch.ones_like(fake_dy).to(self.device))
@@ -194,7 +195,6 @@ class CycleGAN(LightningModule):
             val_dy_loss = self.mse(real_dy, torch.ones_like(real_dy).to(self.device))
 
             loss_d = (rec_loss + val_dx_loss + val_dy_loss) / 3
-            self.train_step += 1
             self.log("loss_d", loss_d)
 
             self.manual_backward(loss_d)
