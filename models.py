@@ -140,7 +140,7 @@ class CycleGAN(LightningModule):
         fake_x = self.gy(real_y)
 
         # save images
-        if self.train_step % 50 == 0:
+        if self.train_step % 300 == 0:
             imgs = [
                 real_x[0].cpu().detach().permute(1, 2, 0).numpy(), 
                 real_y[0].cpu().detach().permute(1, 2, 0).numpy(), 
