@@ -234,7 +234,7 @@ class CycleGAN(LightningModule):
 
         self.train_step += 1
         self.counter_gen_dis += 1
-        if self.counter_gen_dis > 300:
+        if self.counter_gen_dis > 1:
             self.counter_gen_dis = 0
 
         fake_y = self.gx(real_x)
@@ -252,7 +252,7 @@ class CycleGAN(LightningModule):
             self.logger.log_image(key=f"sample", caption=img_names, images=imgs)
 
         # update generators
-        if self.counter_gen_dis > 150:
+        if self.counter_gen_dis >= 1:
             opt_gx.zero_grad()
             opt_gy.zero_grad()
             rec_x = self.gy(fake_y)
