@@ -128,76 +128,83 @@ class CycleGAN(LightningModule):
         return self.gx(x)
     
     def training_step(self, batch, batch_idx):
-        real_x, real_y = batch
         opt_gx, opt_gy, opt_dx, opt_dy = self.optimizers()
+        real_x, real_y = batch
 
-        # Generate fake images
+        self.train_step += 1
+        self.counter_gen_dis += 1
+        if self.counter_gen_dis > 300:
+            self.counter_gen_dis = 0
+
         fake_y = self.gx(real_x)
         fake_x = self.gy(real_y)
 
-        # Save images every 50 steps
-        if self.global_step % 50 == 0:
+        # save images
+        if self.train_step % 50 == 0:
             imgs = [
                 real_x[0].cpu().detach().permute(1, 2, 0).numpy(), 
                 real_y[0].cpu().detach().permute(1, 2, 0).numpy(), 
                 fake_y[0].cpu().detach().permute(1, 2, 0).numpy(),
                 fake_x[0].cpu().detach().permute(1, 2, 0).numpy(),
             ]
-            img_names = ["real_x", "real_y", "fake_y", "fake_x"]
-            self.logger.log_image(key="sample", caption=img_names, images=imgs)
+            img_names = [f"real_x", f"real_y", f"fake_x", f"fake_y"]
+            self.logger.log_image(key=f"sample", caption=img_names, images=imgs)
 
-        # Compute discriminator losses
-        real_dx = self.dx(real_x)
-        real_dy = self.dy(real_y)
-        fake_dx = self.dx(fake_x.detach())
-        fake_dy = self.dy(fake_y.detach())
-
-        loss_dx_real = self.mse(real_dx, torch.ones_like(real_dx))
-        loss_dy_real = self.mse(real_dy, torch.ones_like(real_dy))
-        loss_dx_fake = self.mse(fake_dx, torch.zeros_like(fake_dx))
-        loss_dy_fake = self.mse(fake_dy, torch.zeros_like(fake_dy))
-
-        loss_d = (loss_dx_real + loss_dy_real + loss_dx_fake + loss_dy_fake) / 4
-
-        # Compute generator losses
-        rec_x = self.gy(fake_y)
-        rec_y = self.gx(fake_x)
-        rec_x_loss = self.mae(rec_x, real_x)
-        rec_y_loss = self.mae(rec_y, real_y)
-        rec_loss = (rec_x_loss + rec_y_loss) / 2
-
-        id_x = self.mae(fake_x, real_x)
-        id_y = self.mae(fake_y, real_y)
-        id_loss = (id_x + id_y) / 2
-
-        val_dx = self.dx(fake_x)
-        val_dy = self.dy(fake_y)
-        val_gx = self.mse(val_dx, torch.ones_like(val_dx))
-        val_gy = self.mse(val_dy, torch.ones_like(val_dy))
-        val_loss = (val_gx + val_gy) / 2
-
-        loss_g = val_loss + self.rec_coef * rec_loss + self.id_coef * id_loss
-
-        # Decide whether to train discriminator or generator based on losses
-        if loss_d > loss_g:
-            # Train discriminator
-            opt_dx.zero_grad()
-            opt_dy.zero_grad()
-            self.manual_backward(loss_d)
-            opt_dx.step()
-            opt_dy.step()
-            self.log("loss_d", loss_d, prog_bar=True)
-        else:
-            # Train generator
+        # update generators
+        if self.counter_gen_dis > 150:
             opt_gx.zero_grad()
             opt_gy.zero_grad()
-            self.manual_backward(loss_g)
-            opt_gx.step()
-            opt_gy.step()
-            self.log("loss_g", loss_g, prog_bar=True)
+            rec_x = self.gy(fake_y)
+            rec_y = self.gx(fake_x)
+            fake_dx = self.dx(fake_x).detach()
+            fake_dy = self.dy(fake_y).detach()
+
+            val_gx = self.mse(fake_dx, torch.ones_like(fake_dx).to(self.device))
+            val_gy = self.mse(fake_dy, torch.ones_like(fake_dy).to(self.device))
+            val_loss = (val_gx + val_gy) / 2
+
+            rec_x_loss = self.mae(rec_x, real_x)
+            rec_y_loss = self.mae(rec_y, real_y)
+            rec_loss = (rec_x_loss + rec_y_loss) / 2
+
+            id_x = self.mae(fake_x, real_x)
+            id_y = self.mae(fake_y, real_y)
+            id_loss = (id_x + id_y) / 2
+
+            loss_g = val_loss + self.rec_coef*rec_loss + self.id_coef*id_loss
+
+            self.log("loss_g", loss_g)
             self.log("validity", val_loss)
             self.log("recon", rec_loss)
             self.log("identity", id_loss)
+
+            # needs to be done maually now :|
+            self.manual_backward(loss_g)
+            opt_gx.step()
+            opt_gy.step()
+
+        # update discriminators
+        else:
+            opt_dx.zero_grad()
+            opt_dy.zero_grad()
+            real_dx = self.dx(real_x)
+            real_dy = self.dy(real_y)
+            fake_dx = self.dx(fake_x.detach())
+            fake_dy = self.dy(fake_y.detach())
+
+            rec_dx_loss = self.mse(fake_dx, torch.zeros_like(fake_dx).to(self.device))
+            rec_dy_loss = self.mse(fake_dy, torch.zeros_like(fake_dy).to(self.device))
+            rec_loss = (rec_dx_loss + rec_dy_loss) / 2
+
+            val_dx_loss = self.mse(real_dx, torch.ones_like(real_dx).to(self.device))
+            val_dy_loss = self.mse(real_dy, torch.ones_like(real_dy).to(self.device))
+
+            loss_d = (rec_loss + val_dx_loss + val_dy_loss) / 3
+            self.log("loss_d", loss_d)
+
+            self.manual_backward(loss_d)
+            opt_dx.step()
+            opt_dy.step()
 
     def configure_optimizers(self):
         self.gx_optimizer = optim.Adam(self.gx.parameters(), lr=self.g_lr, betas=(0.5, 0.999))
